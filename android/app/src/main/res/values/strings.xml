@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">vCenter</string>
+    <string name="connected_title">Đã đăng nhập vCenter</string>
+    <string name="brand">WebNew</string>
+    <string name="overview">Tổng quan</string>
+    <string name="vms">Máy ảo</string>
+    <string name="hosts">Host</string>
+    <string name="tasks">Task</string>
+    <string name="datastores">Datastore</string>
+    <string name="network">Network</string>
+    <string name="alarms">Cảnh báo</string>
+    <string name="connections">Kết nối</string>
+    <string name="scope">API / Phạm vi</string>
+    <string name="menu">Menu khác</string>
+    <string name="disconnected">Chưa kết nối vCenter</string>
+    <string name="disconnected_body">Dữ liệu chỉ xuất hiện sau khi đăng nhập và đọc từ API chính thức của vCenter 8. Không có dữ liệu mô phỏng.</string>
+    <string name="configure">Cấu hình kết nối</string>
+    <string name="connection_title">Kết nối vCenter 8</string>
+    <string name="connection_body">Mốc hiện tại kiểm tra giao diện Android và Samsung qua ADB. Bước tiếp theo tích hợp HTTPS, SOAP /sdk, hồ sơ kết nối và hai bộ tài khoản vCenter / NPM riêng biệt. Chưa thu thập hoặc lưu mật khẩu.</string>
+    <string name="scope_title">Trạng thái tích hợp</string>
+    <string name="scope_body">M1: đăng nhập SOAP /sdk vCenter 8 qua HTTPS (tùy chọn NPM Basic Auth), Logout; người dùng xác nhận đăng nhập thật.\n\nM2: đọc chỉ đọc VM, host, cluster, datastore, Network, vDS và distributed portgroup bằng PropertyCollector; tổng quan từ property truy cập được. Chưa đối chiếu inventory trên Samsung.\n\nĐã bổ sung lọc trạng thái VM, đọc cây snapshot và tổng tài nguyên CPU/RAM/Storage ESXi bằng ba thanh đã dùng/trống/tổng (inventory cập nhật 20 giây khi mở Tổng quan); chưa đối chiếu server thật.\n\nĐã bổ sung resource pool, health host/cluster, đọc vSwitch/portgroup/VMkernel/uplink, vDS LAG/LACP và alarm/event có giới hạn truy vấn; chưa đối chiếu server thật.\n\nM3: đã tích hợp TaskManager/TaskHistoryCollector, nguồn VM và snapshot có xác nhận, lưu lệnh chờ đối soát và không tự gửi lại. Chỉ kiểm thử tự động, chưa thử thao tác trên vCenter thật hoặc nghiệm thu M3.\n\nChưa tích hợp: nhập CA riêng, tạo VM, Edit Settings, clone/migration và quản trị host/network. Không tự động khôi phục phiên hay đăng nhập lại.</string>
+    <string name="tasks_body">Chưa đọc TaskManager từ vCenter. Không tạo task cục bộ thay cho task thật hoặc tự xác nhận thao tác thành công.</string>
+    <string name="milestone">M1 · Kết nối /sdk; inventory chưa tích hợp</string>
+</resources>
