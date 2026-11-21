@@ -7,3 +7,7 @@ Tạo project Android trong android/ bằng Kotlin và Jetpack Compose. Dùng k�
 Hoàn thiện lần lượt theo lộ trình trong REQUIREMENTS.md. Trước tiên build và giao APK thật có cấu hình kết nối cùng inventory dữ liệu thật. Sau đó triển khai đầy đủ thao tác VM, Edit Settings, migration, host/cluster/network và task phía vCenter. Ghi rõ chức năng đã kiểm thử và chức năng còn thiếu. Các API không trả task không được tạo task vCenter giả. Không tự thao tác thay đổi trên hạ tầng thật trong quá trình kiểm thử nếu chưa có đối tượng và phạm vi được người dùng cho phép.
 
 Tự kiểm tra môi trường Android SDK/JDK/Gradle, dùng phiên bản tương thích và cung cấp Gradle Wrapper. Nếu thiếu dependency hoặc môi trường build, xử lý trong khả năng và nêu blocker cụ thể. Không báo APK đã hoàn thành khi chưa build ra file. Bàn giao code, APK và hướng dẫn build. Dữ liệu đăng nhập thật do người dùng nhập trong app, không đưa vào source/log.
+
+Mỗi lần thêm hay thay đổi gì đó phải ghi ra file CHANGELOG.MD cho tôi để tiện đối soát sau này.
+
+Code xong nếu có tích hợp adb thì chuyển app mới qua điện thoại .

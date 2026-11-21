@@ -2,9 +2,9 @@
 
 ## Trạng thái source khi đưa lên Git (20/11/2026)
 
-Source hiện tại gồm M1-M3 và phần M4 đang triển khai, chưa phải bản M4 hoàn chỉnh. Lần compile gần nhất của phần M4 chưa đạt vì `VmListScreen.kt` tham chiếu `VmAdvancedPanel` nhưng chưa có phần triển khai tương ứng; chưa xác minh APK mới từ snapshot source này. Các kết quả build/test M1-M3 bên dưới là kết quả trước thay đổi M4, không áp dụng cho snapshot hiện tại.
+Source hiện tại gồm M1-M3 và phần M4 đang triển khai, chưa phải bản M4 đã nghiệm thu. Đã bổ sung `VmAdvancedPanel` và build debug thành công sau khi sửa giao diện Snapshot ngày 20/11/2026. Các kết quả build/test M1-M3 lịch sử bên dưới là kết quả trước thay đổi M4; không thay thế nghiệm thu M4 trên vCenter thật.
 
-Git lưu source Android, test, Gradle Wrapper, tài liệu và giao diện tham chiếu. Không lưu SDK/JDK cục bộ, cache Gradle, thư mục build, APK/AAB, `local.properties`, cấu hình IDE, khóa ký hoặc file môi trường riêng; các file này vẫn giữ trên máy và được loại bằng `.gitignore`.
+Git lưu source Android, Gradle Wrapper, tài liệu và giao diện tham chiếu. Theo yêu cầu ngày 21/11/2026, toàn bộ source unit test và instrumentation test đã bị xóa khỏi repository và máy; kết quả test và hướng dẫn test bên dưới chỉ còn giá trị lịch sử, không chạy được nếu chưa khôi phục các file test từ lịch sử Git. Không lưu SDK/JDK cục bộ, cache Gradle, thư mục build, APK/AAB, `local.properties`, cấu hình IDE, khóa ký hoặc file môi trường riêng; các file này vẫn giữ trên máy và được loại bằng `.gitignore`.
 
 ## Dùng gói này trong IDE
 
@@ -19,6 +19,29 @@ Git lưu source Android, test, Gradle Wrapper, tài liệu và giao diện tham 
 - Cây Cluster/ESXi dùng đệm và thụt lề nhỏ; hàng VM tối thiểu 48 dp, tên và OS giới hạn một dòng, tên dài có dấu ba chấm và xem đầy đủ trong chi tiết.
 - Thu gọn tiêu đề bảng, cột tên/trạng thái và badge nguồn; vẫn cuộn ngang để xem các cột còn lại và bấm VM để mở chi tiết.
 - Hộp chi tiết VM theo mẫu web: tên và badge nguồn cùng hàng, hai thẻ CPU/RAM và Host/Datastore cạnh nhau, sáu nút thao tác theo lưới hai cột và nút Đóng ở góc phải. RAM đổi từ MiB sang GiB. Nguồn và Snapshot mở hộp thao tác riêng đồng bộ màu với chi tiết, có tiêu đề, tên VM, nút Quay lại và lý do khi thao tác không khả dụng; không dùng menu thả xuống phủ lên nội dung. Giữ xác nhận trước khi gửi lệnh; cây snapshot xem trong hộp Snapshot. Migration, Cấu hình, Clone VM và Console dùng màu vô hiệu hóa và nhãn Chưa hỗ trợ vì chưa tích hợp; không chạy dữ liệu mô phỏng.
+
+### Sua nut thao tac VM ngay 21/11/2026
+
+- Cac nut Cau hinh, Clone VM va Migration trong chi tiet VM mo truc tiep nhom tuong ung va doc lai cau hinh; khong con la nut placeholder khi callback M4 san sang. Migration van chi la cold migration, chua co live/Storage vMotion.
+- Moi lan mo chi tiet VM, app tu doc lai inventory va cau hinh tu vCenter; khoa nut gui trong khi kiem tra hoac khi doc loi, co nut thu lai. Khong yeu cau sang tab Task de xem trang thai VM.
+- Loi thao tac thong thuong (ke ca loi validation truoc khi gui) khong duoc coi la lenh chua doi soat va khong khoa gui lenh moi. Loi doc so lenh duoc theo doi rieng; lenh chua ket thuc chi khoa dung VM lien quan.
+- Lenh chua doi soat van chan gui lenh thay doi, ke ca bat nguon, nhung khong chan doc cau hinh VM. Kiem tra Task va doi chieu vSphere Client truoc khi xac nhan doi soat; khong xoa so lenh de bo qua khoa an toan.
+
+### Chi tiet tai nguyen VM
+
+- Hai khung CPU/RAM/Disk va Host/Datastore cung chieu rong/chieu cao, tu gian theo noi dung.
+- Disk la tong dung luong cau hinh VirtualDisk tu `config.hardware.device` (GiB), khong phai dung luong datastore hay dung luong da dung trong guest. Thieu capacity bat ky disk nao thi hien chua co du lieu, khong cong tong thieu. Can refresh inventory de lay property moi.
+
+### Dieu chinh popup Snapshot
+
+- Danh sach snapshot gon: padding doc 6 dp, nut chon cach noi dung 8 dp; ten/nhan hien tai cung hang, ngay gio/reference cung hang, mo ta rieng neu co. Vung cham ca hang toi thieu 48 dp. Ngay gio hien `dd-MM-yyyy HH:mm:ss` theo mui gio dien thoai, khong hien chuoi ISO/raw khi loi. Ten VM nam ben phai tieu de Snapshot, toi da hai dong.
+
+- Hop xac nhan can giua checkbox/radio voi nhan; bo dong thong bao chung server kiem tra quyen, giu canh bao nguy hiem theo thao tac. Huy dung nut vien, Xac nhan dung nut nen xanh; khong thay doi validation hay co che gui lenh.
+
+- Icon Nguon/Snapshot ve bang Canvas, khong dung ky tu phu thuoc font Android.
+- Mo Snapshot hien ngay danh sach theo cap, danh dau snapshot hien tai va cho chon snapshot truoc khi bam Xoa/Revert; khong can bam mo cay lan nua.
+- Cac nut Tao moi, Revert, Xoa, Xoa toan bo va Consolidate disk gon theo noi dung, tu xuong dong theo chieu rong; giu vung cham toi thieu 48 dp. Xoa/Revert dung snapshot da chon va van can xac nhan truoc khi gui. Thieu du lieu/quyen hoac khong du dieu kien thi nut bi khoa.
+- Da bo sung `VmAdvancedPanel` de go loi compile M4: CPU/RAM/topology/hot add, disk, NIC, ISO, boot, clone va cold migration su dung hop dong va validation M4 hien co. Chon doi tuong tu inventory, doc config truoc khi sua, xem lai va xac nhan truoc gui; khoa khi busy/cho doi soat. Chua nghiem thu M4 tren vCenter that.
 
 ## Bố cục Host
 
@@ -75,6 +98,32 @@ Danh sách VM hỗ trợ kết hợp tìm tên và lọc nguồn: tất cả, đ
 
 API 8.0.3 chính thức: [PropertyCollector RetrievePropertiesEx/Continue/Cancel](https://developer.broadcom.com/xapis/vsphere-web-services-api/8.0.3/vmodl.query.PropertyCollector.html), [ViewManager CreateContainerView](https://developer.broadcom.com/xapis/vsphere-web-services-api/8.0.3/vim.view.ViewManager.html), [ContainerView](https://developer.broadcom.com/xapis/vsphere-web-services-api/8.0.3/vim.view.ContainerView.html), [ManagedObjectView DestroyView](https://developer.broadcom.com/xapis/vsphere-web-services-api/8.0.3/vim.view.ManagedObjectView.html).
 
+## Code va debug qua ADB Wi-Fi trong VS Code
+
+Bo cong cu rieng cua du an: JDK 17 trong `.tools/jdk/`, Android SDK trong `.tools/android-sdk/` (platform-tools, platforms;android-35, build-tools;35.0.0). Cac thu muc nay khong commit; khong thay doi Java/PATH mac dinh cua Windows.
+
+Trong PowerShell tai thu muc goc:
+
+```powershell
+. .\android\scripts\Enter-AndroidEnv.ps1
+adb devices -l
+```
+
+Android 11+: bat Developer options > Wireless debugging, PC va dien thoai cung mang Wi-Fi. Lan dau mo **Pair device with pairing code**, lay **IP address & port** cua hop thoai de chay lenh sau; nhap ma khi terminal yeu cau (khong ghi ma vao file):
+
+```powershell
+.\android\scripts\Android-Dev.ps1 -Action Pair -Serial '10.0.1.52:PORT_PAIR'
+.\android\scripts\Android-Dev.ps1 -Action Connect -Serial '10.0.1.52:PORT_CONNECT'
+.\android\scripts\Android-Dev.ps1 -Action Run -Serial '10.0.1.52:PORT_CONNECT'
+.\android\scripts\Android-Dev.ps1 -Action Logcat -Serial '10.0.1.52:PORT_CONNECT'
+```
+
+Thay PORT_PAIR/PORT_CONNECT bang cong TCP that (1-65535). Cong ket noi nam o man hinh Wireless debugging chinh, KHAC cong pairing; ma pairing khong phai cong. Cong co the doi sau khi bat/tat Wi-Fi/debug. `adb mdns services` giup xem dich vu dang quang ba; chi ket noi thiet bi cua ban. Khong tu dong bat ADB TCP 5555, sua firewall, kill ADB server hay xoa du lieu.
+
+VS Code: **Terminal > Run Task** co **Android: Pair Wi-Fi**, **Android: Connect Wi-Fi**, **Android: Build Debug**, **Android: Build, Install and Run**, **Android: App Logcat**. Ctrl+Shift+B build debug. Task hoi endpoint moi lan, khong luu IP/ma pairing trong Git. Run chi cai de bang `adb install -r` sau khi build thanh cong; khong uninstall/clear data. Neu chu ky APK cu khac debug keystore may nay, dung lai va dung dung keystore cu; khong go app de vuot loi. Logcat chi loc process app dang chay; Ctrl+C de dung, chay lai task khi process restart. Khong chia se log chua thong tin nhay cam. Day la debug bang log, khong phai breakpoint Kotlin/Java.
+
+Kiem tra ngay 20/11/2026: JDK 17/SDK 35 va ADB Wi-Fi da hoat dong voi Samsung SM-N976N Android 12. Sau bo sung panel M4 va sua Snapshot: assembleDebug thanh cong, 54 unit test va 11 UI test M3/panel M4 dat; lint 0 loi/15 canh bao. Cai de app chinh bi tu choi `INSTALL_FAILED_UPDATE_INCOMPATIBLE` do chu ky khac APK cu; khong go app hay xoa du lieu. Can debug keystore goc de cai de giu ho so. UI test dung app uitest rieng, khong thao tac vCenter that.
+
 ## Build Android trên Windows
 
 Cấu hình M0: JDK 17, Gradle 8.11.1, Android Gradle Plugin 8.9.2, Kotlin 2.1.20, Android SDK/target 35, Build Tools 35.0.0, minSdk 26 (Android 8.0). minSdk là lựa chọn ban đầu, cần đối chiếu với Samsung thử nghiệm. Application ID: `vn.webnew.vcenter`.
@@ -108,7 +157,18 @@ Tab Máy ảo hiển thị cây Cluster → ESXi → VM, mở/thu gọn từng n
 
 Dung lượng RAM và lưu trữ ở Tổng quan/danh sách tự chuyển từ GiB sang TiB khi đạt 1.000 GiB, giữ một chữ số thập phân và cách tính nhị phân (1 TiB = 1.024 GiB). 
 
+### Hộp cấu hình, Clone và Migration
+
+Hộp CPU/RAM bố trí vCPU và core/socket cùng hàng, nhóm hot add tự xuống dòng khi thiếu chỗ; Tải lại cấu hình và Đóng ở cùng hàng cuối. Màn xác nhận chỉ trình bày thay đổi và lỗi liên quan, vẫn yêu cầu xác nhận gửi lệnh. Lỗi HTTP 401/403 ghi đúng API đang gọi (ví dụ ReconfigVM_Task), không gắn nhãn đăng xuất. HTTP lỗi sau khi gửi vẫn được đối soát Task; không tự gửi lại vì chưa thể xác nhận lệnh đã chạy hay chưa. Nếu gặp 403, kiểm tra Access List/IP và log NPM/WAF/upstream cho POST /sdk cùng quyền cấu hình VM trên vCenter; ứng dụng không thể tự sửa chính sách từ chối của server.
+
+Ba nút trong chi tiết VM mở hộp riêng, không chèn form quản trị vào cuối chi tiết. Cấu hình chọn nhóm phần cứng; Clone và Migration chỉ hiển thị trường liên quan. Các trường chọn có cùng chiều rộng, tên VM và trạng thái nguồn hiển thị gọn; không đưa milestone/changeVersion lên giao diện. Clone và Migration yêu cầu chọn ESXi đích trước khi hiển thị các trường còn lại. Resource pool lấy theo compute/cluster của ESXi; folder VM lấy theo datacenter của ESXi; datastore chỉ gồm datastore ESXi truy cập được. Đổi ESXi sẽ xóa lựa chọn folder/resource pool/datastore cũ. Migration chỉ cho giữ datastore hiện tại khi ESXi đích truy cập đủ mọi datastore của VM; nếu không phải chọn datastore đích. Chỉ hiển thị lỗi nhập liệu sau khi bấm Tiếp tục; màn xác nhận trình bày tên đối tượng và thay đổi dễ đọc, vẫn cần xác nhận trước khi gửi lên vCenter.
+
 ## M3: Task, nguồn VM và snapshot
+
+- Task tu dong lam moi moi 20 giay khi app dang foreground va da dang nhap, ke ca khi dang o tab Task (truoc day 5 giay). Overview/Canh bao van giu chu ky 20 giay; khong thay doi viec doc lai task ngay sau khi gui lenh.
+
+- Danh sach Task sap theo thoi gian giam dan: ket thuc, neu chua co/khong hop le thi dung bat dau, sau do vao hang doi; thieu tat ca thoi gian xep cuoi. Moc hien tren the cung la moc dung sap xep.
+- Ten thao tac VM va host network da nhan dien duoc hien bang tieng Viet (vi du `host.NetworkSystem.removeVirtualSwitch` thanh Xoa vSwitch); thao tac chua nhan dien giu mo ta/ma server, khong doan. The giu doi tuong/IP, tai khoan, trang thai, thoi gian/thoi luong va ma task; Chi tiet giu mo ta va API/Description ID goc.
 
 - Thời điểm cập nhật và nút làm mới nằm trên header chung, theo nguồn của màn đang xem (Task, cảnh báo/sự kiện hoặc inventory). Loading chạy ngay dưới thời gian trong vùng cao cố định, không chèn/xóa dòng trong nội dung khi polling. Bỏ các khối tiêu đề/mô tả/làm mới trùng trong Task, VM, Host, Tổng quan, Datastore và Network; giữ các nhãn phạm vi truy vấn, trạng thái lỗi và thanh tiến độ tài nguyên/task thật. Kết nối cũng hiển thị loading ở header thay vì chèn dòng vào biểu mẫu.
 
@@ -118,7 +178,7 @@ Dung lượng RAM và lưu trữ ở Tổng quan/danh sách tự chuyển từ G
 
 - Tab Task đọc TaskHistoryCollector trong 24 giờ theo giờ server, tối đa 100 task lịch sử theo quyền tài khoản; giải phóng collector sau truy vấn. Task từ app có reference được đọc riêng, kể cả ngoài trang lịch sử. Khi foreground, tải lại mỗi 5 giây ở tab Task hoặc 20 giây ở tab khác; không polling khi app ở nền.
 - Chi tiết VM có menu nguồn/snapshot: power on/off/reset, shutdown/reboot guest, tạo/revert/xóa snapshot, xóa toàn bộ và consolidate disk. Mọi lệnh đều cần xác nhận; guest cần Tools đang chạy, consolidation cần server báo cần thiết. Đọc lại inventory trước khi gửi để kiểm tra nguồn/snapshot/Tools mới nhất; server quyết định quyền/capability cuối cùng. Không tự tắt VM hoặc tự gửi lại lệnh.
-- Sổ lệnh riêng trong preferences `operations` lưu reference, thời điểm, loại lệnh và phạm vi hồ sơ/endpoint/tài khoản/instance, không lưu mật khẩu hoặc cookie. Ghi bền trước khi gửi; khởi động lại và đăng nhập đúng phạm vi sẽ đối soát task từ server. Task mất/không truy cập được không được coi là thành công. Lệnh timeout hoặc guest đồng bộ chặn lệnh mới cho cùng VM tới khi người dùng xác nhận đã kiểm tra trên vSphere Client. Xác nhận thủ công không phải kết quả thành công.
+- Sổ lệnh riêng trong preferences `operations` lưu reference, thời điểm, loại lệnh và phạm vi hồ sơ/endpoint/tài khoản/instance, không lưu mật khẩu hoặc cookie. Ghi bền trước khi gửi; khởi động lại và đăng nhập đúng phạm vi sẽ đối soát task từ server. Task mất/không truy cập được không được coi là thành công. Bản ghi lệnh cũ không khóa thao tác mới; bỏ đối soát thủ công. Mỗi lệnh vẫn cần xác nhận, kiểm tra trạng thái/cấu hình mới nhất và ghi lịch sử trước khi gửi. Sau khi nhận Task reference, app tải kết quả ngay và theo dõi mỗi 3 giây khi có lệnh chưa kết thúc ở foreground (20 giây khi không có); chỉ Task success/error mới xác nhận kết quả. SOAP Fault được ghi là lệnh bị từ chối, không nhầm với mất phản hồi mạng. Shutdown guest được theo dõi bằng trạng thái nguồn đọc lại; reboot guest chỉ ghi server đã nhận yêu cầu vì API không trả Task và VM đang chạy không chứng minh reboot hoàn tất. Mất phản hồi sau gửi không tự gửi lại, không đoán thành công và không khóa VM; Task không truy cập được vẫn được thử đọc lại. Lỗi đọc/ghi lịch sử cục bộ hoặc đang gửi yêu cầu vẫn ngăn gửi đồng thời. VM tắt/tạm dừng hiển thị Bật nguồn, VM đang chạy hiển thị Tắt nguồn.
 - ShutdownGuest/RebootGuest chỉ báo đã gửi, không tạo task giả hoặc coi guest đã hoàn tất. Nút hủy chỉ xuất hiện cho task queued/running có cancelable; kiểm tra lại trước khi gửi và đọc lại sau gửi, không tự đánh dấu đã hủy. Server có thể từ chối do thiếu quyền.
 - M3 mới kiểm thử tự động bằng fixture/app uitest, chưa chạy bất kỳ thao tác thay đổi nào trên vCenter thật; chưa nghiệm thu M3. Cần VM lab được chỉ định và cho phép trước khi test thành công/lỗi quyền/mất mạng sau gửi/mở lại app trên server. Tạo VM, clone, migration và Edit Settings vẫn ngoài phạm vi đợt này.
 

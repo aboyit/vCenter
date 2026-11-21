@@ -20,7 +20,8 @@ output-metadata.json
 # Machine-specific configuration and editor state
 local.properties
 .idea/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
 *.iml
 .DS_Store
 Thumbs.db

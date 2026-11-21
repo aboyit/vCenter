@@ -166,7 +166,7 @@ internal class VsphereSession(private val profile: Profile, private val credenti
             if (response.code in 300..399) throw SoapFailure("Proxy chuyển hướng; kết nối bị từ chối để bảo vệ tài khoản.")
             if (response.code == 401 || response.code == 403) {
                 throw SoapFailure(HttpAccessFailure.describe(response.code, stage,
-                    response.header("WWW-Authenticate"), profile.npmEnabled))
+                    response.header("WWW-Authenticate"), profile.npmEnabled), httpStatus = response.code)
             }
             if (response.code == 408 || response.code == 504) throw SoapFailure("Server hết thời gian phản hồi.")
             if (response.code !in 200..299 && response.code != 500) throw SoapFailure("Lỗi HTTP ${response.code} từ server.")

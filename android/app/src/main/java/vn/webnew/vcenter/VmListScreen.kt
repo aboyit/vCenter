@@ -134,6 +134,9 @@ internal fun VmListScreen(inventory: InventorySnapshot, state: ConnectionState =
 internal fun VmDetailDialog(inventory: InventorySnapshot, vm: InventoryItem, state: ConnectionState,
     operate: ((VmOperation) -> Unit)?, loadConfig: ((String) -> Unit)? = null,
     advanced: ((AdvancedOperation) -> Unit)? = null, onDismiss: () -> Unit) {
+    var advancedMode by remember(vm.ref) { mutableStateOf<String?>(null) }
+    LaunchedEffect(vm.ref) { loadConfig?.invoke(vm.ref) }
+    val checking = loadConfig != null && (state.vmConfigLoading || state.vmConfig?.vmRef != vm.ref || state.vmConfigError != null)
     val power = vm.get("runtime.powerState")
     val status = when (power) {
         "poweredOn" -> "Đang chạy"
@@ -162,27 +165,39 @@ internal fun VmDetailDialog(inventory: InventorySnapshot, vm: InventoryItem, sta
                 }
                 Text("${vm.get("config.guestFullName") ?: "Chưa có OS"} · ${vm.get("guest.ipAddress") ?: "Chưa có IP"}",
                     color = vmMuted, fontSize = 12.sp)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    VmDetailMetric("CPU / RAM", "${vm.get("config.hardware.numCPU") ?: "—"} vCPU / $memory",
-                        Modifier.weight(1f).testTag("vm-detail-resources"))
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val disk = vm.number("disk.capacityBytes")?.takeIf { it >= 0 }?.let {
+                        String.format(Locale.US, "%.1f", it / 1_073_741_824.0).removeSuffix(".0") + " GiB"
+                    } ?: "Chưa có dữ liệu"
+                    VmDetailMetric("CPU / RAM / Disk", "${vm.get("config.hardware.numCPU") ?: "—"} vCPU / $memory\nDisk: $disk",
+                        Modifier.weight(1f).fillMaxHeight().testTag("vm-detail-resources"))
                     VmDetailMetric("Host / Datastore",
                         "${vm.links["runtime.host"]?.firstOrNull()?.let(inventory::name) ?: "Chưa có host"} / " +
                             (vm.links["datastore"]?.takeIf { it.isNotEmpty() }?.joinToString { inventory.name(it) } ?: "Chưa có datastore"),
-                        Modifier.weight(1f).testTag("vm-detail-placement"))
+                        Modifier.weight(1f).fillMaxHeight().testTag("vm-detail-placement"))
                 }
-                VmActionsContent(vm, state.operationBusy,
-                    state.operationError != null || state.pendingOperations.any {
-                        it.vmRef == vm.ref && it.status !in OperationPolicy.terminal
-                    }, detailLayout = true, available = operate != null, execute = operate ?: {})
+                if (state.operationJournalError) Text("Không đọc được sổ lệnh; chưa thể gửi thao tác.",
+                    color = MaterialTheme.colorScheme.error)
+                if (checking) {
+                    Text(state.vmConfigError ?: "Đang đọc trạng thái VM từ vCenter…", color = vmMuted)
+                    OutlinedButton(onClick = { loadConfig?.invoke(vm.ref) }, enabled = !state.vmConfigLoading) {
+                        Text("Kiểm tra lại trạng thái VM")
+                    }
+                }
+                VmActionsContent(vm, state.operationBusy || checking,
+                    state.operationJournalError, detailLayout = true, available = operate != null && !state.operationJournalError, execute = operate ?: {},
+                    openAdvanced = if (loadConfig != null && advanced != null) { mode ->
+                        advancedMode = mode
+                        loadConfig(vm.ref)
+                    } else null)
                 if (vm.missing.isNotEmpty()) Text("Property không trả về: ${vm.missing.joinToString()}",
                     color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
                 state.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
-                if (loadConfig != null && advanced != null) VmAdvancedPanel(inventory, vm.ref,
+                if (loadConfig != null && advanced != null && advancedMode != null) VmAdvancedPanel(inventory, vm.ref,
                     state.vmConfig?.takeIf { it.vmRef == vm.ref }, state.vmConfigLoading,
                     state.vmConfigError, state.operationBusy,
-                    state.operationError != null || state.pendingOperations.any {
-                        it.vmRef == vm.ref && it.status !in OperationPolicy.terminal
-                    }, load = { loadConfig(vm.ref) }, execute = advanced)
+                    state.operationJournalError, load = { loadConfig(vm.ref) }, execute = advanced, requestedMode = advancedMode,
+                    onDismiss = { advancedMode = null })
                 state.advancedVerification?.let { Text(it, color = vmMuted, fontSize = 11.sp) }
                 Text("Console chưa tích hợp. M4 chưa nghiệm thu trên vCenter thật.", color = vmMuted, fontSize = 11.sp)
                 OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(7.dp),

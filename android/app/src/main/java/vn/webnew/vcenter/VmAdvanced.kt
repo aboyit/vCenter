@@ -160,13 +160,15 @@ internal object VmAdvancedSoap {
             is AdvancedCommand.Clone -> when {
                 config.power != "poweredOff" -> "Clone an toàn trong app chỉ hỗ trợ VM đã tắt."
                 command.name.isBlank() || command.name.length > 80 -> "Tên clone cần 1-80 ký tự."
-                inventory.ofType("Folder").none { it.ref == command.folder } -> "Chọn thư mục đích hợp lệ."
+                VmPlacement(inventory, command.host).folders.none { it.ref == command.folder } -> "Chọn thư mục VM thuộc datacenter của ESXi đích."
                 else -> targetReason(command.host, command.pool, command.datastore, inventory)
             }
             is AdvancedCommand.Migrate -> when {
                 config.power != "poweredOff" -> "Migration trong app chỉ hỗ trợ VM đã tắt."
                 command.datastore == null && command.host == inventory.vms.firstOrNull { it.ref == config.vmRef }
                     ?.links?.get("runtime.host")?.firstOrNull() -> "Host đích trùng host hiện tại."
+                command.datastore == null && !VmPlacement(inventory, command.host).canKeepDatastores(config.vmRef) ->
+                    "ESXi đích không truy cập đủ datastore hiện tại; chọn datastore đích."
                 else -> targetReason(command.host, command.pool, command.datastore, inventory)
             }
         }
@@ -190,8 +192,8 @@ internal object VmAdvancedSoap {
     private fun targetReason(host: String, pool: String, datastore: String?, inventory: InventorySnapshot): String? = when {
         inventory.hosts.none { it.ref == host && it.get("runtime.connectionState") == "connected" &&
             it.get("runtime.inMaintenanceMode") == "false" } -> "Host đích phải kết nối và không maintenance."
-        inventory.resourcePools.none { it.ref == pool } -> "Resource pool đích không tồn tại."
-        datastore != null && inventory.datastores.none { it.ref == datastore && it.get("summary.accessible") == "true" } -> "Datastore đích không truy cập được."
+        VmPlacement(inventory, host).pools.none { it.ref == pool } -> "Resource pool không thuộc compute/cluster của ESXi đích."
+        datastore != null && VmPlacement(inventory, host).datastores.none { it.ref == datastore } -> "ESXi đích không truy cập được datastore đã chọn."
         else -> null
     }
 

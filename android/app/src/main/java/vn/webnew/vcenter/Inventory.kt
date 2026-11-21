@@ -66,10 +66,11 @@ internal data class InventorySnapshot(val items: List<InventoryItem>, val fetche
 
 internal object InventorySoap {
     private val properties = linkedMapOf(
-        "VirtualMachine" to listOf("name", "runtime.powerState", "config.hardware.numCPU", "config.hardware.memoryMB", "config.guestFullName", "guest.ipAddress", "guest.toolsRunningStatus", "runtime.consolidationNeeded", "runtime.host", "datastore", "snapshot", "parent", "resourcePool"),
+        "VirtualMachine" to listOf("name", "runtime.powerState", "config.hardware.numCPU", "config.hardware.memoryMB", "config.hardware.device", "config.guestFullName", "guest.ipAddress", "guest.toolsRunningStatus", "runtime.consolidationNeeded", "runtime.host", "datastore", "snapshot", "parent", "resourcePool"),
         "HostSystem" to listOf("name", "runtime.connectionState", "runtime.inMaintenanceMode", "summary.hardware.numCpuCores", "summary.hardware.cpuMhz", "summary.hardware.memorySize", "summary.quickStats.overallMemoryUsage", "summary.quickStats.overallCpuUsage", "overallStatus", "config.network.vswitch", "config.network.portgroup", "config.network.vnic", "config.network.pnic", "vm", "parent", "datastore", "network"),
-        "ClusterComputeResource" to listOf("name", "host", "overallStatus", "resourcePool"),
-        "ComputeResource" to listOf("name", "host", "resourcePool"),
+        "ClusterComputeResource" to listOf("name", "host", "overallStatus", "resourcePool", "parent"),
+        "ComputeResource" to listOf("name", "host", "resourcePool", "parent"),
+        "Datacenter" to listOf("name", "parent", "vmFolder"),
         "Folder" to listOf("name", "parent", "childType"),
         "ResourcePool" to listOf("name", "parent", "vm", "resourcePool"),
         "Datastore" to listOf("name", "summary.capacity", "summary.freeSpace", "summary.accessible"),
@@ -119,6 +120,21 @@ internal object InventorySoap {
             direct(obj, "propSet").forEach { prop ->
                 val path = VsphereSoap.children(prop, "name")?.textContent?.trim() ?: return@forEach
                 val value = VsphereSoap.children(prop, "val") ?: return@forEach
+                if (type == "VirtualMachine" && path == "config.hardware.device") {
+                    val disks = directElements(value).filter {
+                        it.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance", "type").substringAfter(':') == "VirtualDisk"
+                    }
+                    val capacities = disks.map { disk ->
+                        VsphereSoap.children(disk, "capacityInBytes")?.textContent?.trim()?.toLongOrNull()
+                            ?: VsphereSoap.children(disk, "capacityInKB")?.textContent?.trim()?.toLongOrNull()
+                                ?.takeIf { it >= 0 && it <= Long.MAX_VALUE / 1024 }?.times(1024)
+                    }
+                    if (capacities.all { it != null && it >= 0 }) {
+                        runCatching { capacities.fold(0L) { sum, bytes -> Math.addExact(sum, bytes!!) } }
+                            .getOrNull()?.let { values["disk.capacityBytes"] = it.toString() }
+                    }
+                    return@forEach
+                }
                 if (path == "snapshot") {
                     snapshotInfo = parseSnapshots(value)
                     return@forEach

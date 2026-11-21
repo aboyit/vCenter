@@ -1,0 +1,47 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Android: Build Debug",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\android\\scripts\\Android-Dev.ps1", "-Action", "Build"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Connect Wi-Fi",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\android\\scripts\\Android-Dev.ps1", "-Action", "Connect", "-Serial", "${input:androidSerial}"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Pair Wi-Fi",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\android\\scripts\\Android-Dev.ps1", "-Action", "Pair", "-Serial", "${input:pairEndpoint}"],
+      "problemMatcher": [],
+      "presentation": { "focus": true, "panel": "dedicated" }
+    },
+    {
+      "label": "Android: Build, Install and Run",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\android\\scripts\\Android-Dev.ps1", "-Action", "Run", "-Serial", "${input:androidSerial}"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: App Logcat",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\android\\scripts\\Android-Dev.ps1", "-Action", "Logcat", "-Serial", "${input:androidSerial}"],
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    }
+  ],
+  "inputs": [
+    { "id": "androidSerial", "type": "promptString", "description": "Device IP:connection port from Wireless debugging (not pairing port)" },
+    { "id": "pairEndpoint", "type": "promptString", "description": "IP:pairing port from Pair device with pairing code; enter code in terminal" }
+  ]
+}

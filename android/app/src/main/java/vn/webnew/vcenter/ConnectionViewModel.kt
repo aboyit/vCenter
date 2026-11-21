@@ -29,6 +29,7 @@ internal data class ConnectionState(
     val tasksError: String? = null, val tasksFetchedAt: Long? = null,
     val pendingOperations: List<PendingOperation> = emptyList(),
     val operationBusy: Boolean = false, val operationError: String? = null,
+    val operationJournalError: Boolean = false,
     val vmConfig: VmConfig? = null, val vmConfigLoading: Boolean = false,
     val vmConfigError: String? = null, val advancedVerification: String? = null,
     val advancedPrepared: AdvancedOperation? = null, val advancedPrecheckMessage: String? = null
@@ -50,24 +51,13 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
         val scope = activeOperationScope() ?: return
         try {
             val operations = journal.all().filter { it.scope == scope }
-            _state.value = _state.value.copy(pendingOperations = operations,
-                operationError = if (operations.none { it.status !in OperationPolicy.terminal }) null else _state.value.operationError)
+            _state.value = _state.value.copy(pendingOperations = operations, operationJournalError = false)
         } catch (_: Exception) {
-            _state.value = _state.value.copy(operationError = "Không đọc được sổ lệnh; khóa thao tác để tránh gửi trùng.")
+            _state.value = _state.value.copy(operationJournalError = true,
+                operationError = "Không đọc được lịch sử lệnh cục bộ.")
         }
     }
 
-    fun reviewOperation(id: String) {
-        val operation = _state.value.pendingOperations.firstOrNull { it.id == id } ?: return
-        if (operation.status !in setOf("uncertain", "sent", "unavailable") || _state.value.operationBusy) return
-        try {
-            journal.put(operation.copy(status = "reviewed"))
-            _state.value = _state.value.copy(operationError = null)
-            loadOperations()
-        } catch (_: Exception) {
-            _state.value = _state.value.copy(operationError = "Không lưu được kết quả đối soát; chưa mở khóa lệnh.")
-        }
-    }
     private val _state = MutableStateFlow(ConnectionState())
     val state = _state.asStateFlow()
     private var session: VsphereSession? = null
@@ -282,15 +272,23 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshTasks() {
         val active = session ?: return
-        if (tasksJob?.isActive == true || operationJob?.isActive == true) return
+        if (tasksJob?.isActive == true || _state.value.operationBusy) return
         val attempt = generation
         val scope = activeOperationScope() ?: return
         _state.value = _state.value.copy(tasksLoading = true, tasksError = null)
         tasksJob = viewModelScope.launch {
             try {
-                val tracked = journal.all().filter { it.scope == scope && it.taskRef != null && it.status !in OperationPolicy.terminal }
+                val operations = journal.all().filter { it.scope == scope && it.status !in OperationPolicy.terminal }
+                val tracked = operations.filter { it.taskRef != null }
                 val refs = tracked.mapNotNull { it.taskRef }.distinct()
-                val current = refs.chunked(100).flatMap { active.readTasks(it) }
+                val current = refs.chunked(100).flatMap { batch ->
+                    try { active.readTasks(batch) }
+                    catch (e: CancellationException) { throw e }
+                    catch (e: Exception) {
+                        if (e is SoapFailure && e.expired) throw e
+                        emptyList()
+                    }
+                }
                 var historyError: String? = null
                 val history = try { active.taskHistory() } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
@@ -299,8 +297,9 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
                     _state.value.tasks.filterNot { old -> current.any { it.ref == old.ref } }
                 }
                 if (generation != attempt || session !== active) return@launch
+                val tasks = (current + history).distinctBy { it.ref }
                 tracked.forEach { operation ->
-                    val task = current.firstOrNull { it.ref == operation.taskRef }
+                    val task = tasks.firstOrNull { it.ref == operation.taskRef }
                     journal.put(operation.copy(status = OperationPolicy.reconciledStatus(task?.state)))
                     if (task?.state == "success" && operation.action in setOf("RECONFIGURE_VM", "CLONE_VM", "MIGRATE_VM")) {
                         val target = if (operation.action == "CLONE_VM") task.resultRef
@@ -313,6 +312,17 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
                             "Task ${task.ref} thành công; chưa đọc lại được VM kết quả từ server."
                             else "Task ${task.ref} thành công; đã đọc lại cấu hình VM ${verified.vmRef} từ server (changeVersion ${verified.changeVersion}).")
                     }
+                }
+                val guestCommands = operations.filter { it.taskRef == null && it.status == "sent" }
+                if (guestCommands.isNotEmpty()) {
+                    val inventory = active.inventory()
+                    if (generation != attempt || session !== active) return@launch
+                    guestCommands.forEach { operation ->
+                        val vm = inventory.vms.firstOrNull { it.ref == operation.vmRef }
+                        val status = OperationPolicy.guestStatus(operation, vm?.get("runtime.powerState"))
+                        if (status != operation.status) journal.put(operation.copy(status = status))
+                    }
+                    _state.value = _state.value.copy(inventory = inventory)
                 }
                 val previous = _state.value.pendingOperations.associateBy { it.id }
                 loadOperations()
@@ -338,9 +348,10 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
             advancedPrepared = null, advancedPrecheckMessage = null)
         configJob = viewModelScope.launch {
             try {
+                val inventory = active.inventory()
                 val config = active.vmConfig(vmRef)
                 if (generation == attempt && session === active) _state.value = _state.value.copy(
-                    vmConfig = config, vmConfigLoading = false)
+                    inventory = inventory, inventoryError = null, vmConfig = config, vmConfigLoading = false)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 if (generation == attempt && session === active) {
@@ -355,7 +366,7 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
     fun executeAdvanced(operation: AdvancedOperation) {
         val active = session ?: return
         val scope = activeOperationScope() ?: return
-        if (_state.value.operationBusy || _state.value.operationError != null) return
+        if (_state.value.operationBusy || _state.value.operationJournalError) return
         val inventory = _state.value.inventory ?: return
         val reason = VmAdvancedSoap.validate(operation.baseline, operation.command, inventory)
         if (reason != null || operation.baseline.vmRef != operation.vmRef) {
@@ -363,12 +374,11 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val attempt = generation
-        _state.value = _state.value.copy(operationBusy = true, vmConfigError = null)
+        _state.value = _state.value.copy(operationBusy = true, vmConfigError = null, operationError = null)
         operationJob = viewModelScope.launch {
             var pending: PendingOperation? = null
+            var dispatched = false
             try {
-                if (journal.all().any { OperationPolicy.blocks(it, scope, operation.vmRef) })
-                    throw SoapFailure("VM còn lệnh chưa đối soát; kiểm tra tab Task.")
                 val freshInventory = active.inventory()
                 val fresh = active.vmConfig(operation.vmRef)
                 AdvancedExecutionPolicy.conflict(operation.baseline, fresh)?.let { throw SoapFailure(it) }
@@ -381,6 +391,7 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
                 pending = commandEntry
                 loadOperations()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    dispatched = true
                     val ref = active.executeAdvanced(operation, freshInventory)
                     journal.put(commandEntry.copy(taskRef = ref, status = "queued"))
                 }
@@ -394,11 +405,14 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
             catch (e: Exception) {
                 if (generation == attempt && session === active) {
                     loadOperations()
-                    val message = if (pending == null) "Chưa gửi lệnh. " else
-                        "Chưa xác định kết quả; không tự gửi lại. Kiểm tra Task / vSphere Client. "
+                    val rejected = !dispatched || (e is SoapFailure && e.rejected)
+                    pending?.let { entry -> runCatching { journal.put(entry.copy(status = if (rejected) "rejected" else "uncertain")) } }
+                    loadOperations()
                     _state.value = _state.value.copy(operationBusy = false,
-                        vmConfigError = message + (if (e is SoapFailure) e.message else "Kiểm tra mạng và sổ lệnh."),
-                        operationError = if (pending != null) message else _state.value.operationError)
+                        vmConfigError = HttpAccessFailure.operationMessage(e, rejected, "Kiểm tra mạng và sổ lệnh."),
+                        operationError = HttpAccessFailure.operationMessage(e, rejected, "Kiểm tra kết nối."))
+                    refreshTasks()
+                    refreshInventory()
                     if (e is SoapFailure && e.expired) { invalidate(); _state.value = _state.value.copy(error = e.message) }
                 }
             }
@@ -408,17 +422,13 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
     fun executeOperation(operation: VmOperation) {
         val active = session ?: return
         val scope = activeOperationScope() ?: return
-        if (_state.value.operationBusy || _state.value.operationError != null) return
+        if (_state.value.operationBusy || _state.value.operationJournalError) return
         val vm = _state.value.inventory?.vms?.firstOrNull { it.ref == operation.vmRef } ?: return
         val reason = vmOperationBlockReason(vm, operation)
         if (reason != null) { _state.value = _state.value.copy(operationError = reason); return }
         val pending = PendingOperation(java.util.UUID.randomUUID().toString(), scope, operation.vmRef,
             operation.action.name, System.currentTimeMillis())
         try {
-            if (journal.all().any { OperationPolicy.blocks(it, scope, operation.vmRef) }) {
-                _state.value = _state.value.copy(operationError = "VM còn lệnh chưa đối soát; kiểm tra tab Task trước.")
-                return
-            }
             // Persist before dispatch: a process death must never make an uncertain command retryable.
             journal.put(pending)
             loadOperations()
@@ -429,6 +439,7 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
         val attempt = generation
         _state.value = _state.value.copy(operationBusy = true, operationError = null)
         operationJob = viewModelScope.launch {
+            var dispatched = false
             try {
                 val fresh = active.inventory().vms.firstOrNull { it.ref == operation.vmRef }
                 if (fresh == null) {
@@ -443,21 +454,28 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
                 coroutineContext.ensureActive()
                 if (generation != attempt || session !== active) return@launch
                 kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    dispatched = true
                     val ref = active.executeOperation(operation)
-                    journal.put(pending.copy(taskRef = ref, status = if (ref == null) "sent" else "queued"))
+                    journal.put(pending.copy(taskRef = ref, status = if (ref != null) "queued" else if (operation.action == VmOperationAction.REBOOT_GUEST) "accepted" else "sent"))
                 }
                 if (generation == attempt && session === active) {
                     loadOperations()
                     _state.value = _state.value.copy(operationBusy = false)
+                    refreshTasks()
                     refreshInventory()
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 if (generation == attempt && session === active) {
+                    val rejected = !dispatched || (e is SoapFailure && e.rejected)
+                    runCatching { journal.put(pending.copy(status = if (rejected) "rejected" else "uncertain")) }
                     loadOperations()
                     _state.value = _state.value.copy(operationBusy = false,
-                        operationError = "Chưa xác định kết quả lệnh. Không tự gửi lại; kiểm tra Task / vSphere Client." +
-                            if (e is SoapFailure) " ${e.message}" else "")
+                        operationError = (if (rejected) "Lệnh không được thực hiện. " else
+                            "Mất phản hồi sau khi gửi; đang tải lại Task và trạng thái VM. ") +
+                            (if (e is SoapFailure) e.message else "Kiểm tra kết nối."))
+                    refreshTasks()
+                    refreshInventory()
                     if (e is SoapFailure && e.expired) { invalidate(); _state.value = _state.value.copy(error = e.message) }
                 }
             }
@@ -504,7 +522,8 @@ internal class ConnectionViewModel(app: Application) : AndroidViewModel(app) {
         operationJob?.cancel()
         operationJob = null
         _state.value = _state.value.copy(tasks = emptyList(), tasksLoading = false, tasksError = null,
-            tasksFetchedAt = null, pendingOperations = emptyList(), operationBusy = false, operationError = null)
+            tasksFetchedAt = null, pendingOperations = emptyList(), operationBusy = false, operationError = null,
+            operationJournalError = false)
     }
 
     fun logout() {

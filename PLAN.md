@@ -73,6 +73,19 @@ Mỗi mốc phải có APK build được và kết quả kiểm tra thực tế
 - Kiểm thử hồi quy tự động: 48 unit test và 14 test Samsung đạt; build debug thành công, lint 0 lỗi/16 cảnh báo (thêm gợi ý UseKtx cho ghi preferences đồng bộ của sổ lệnh). Có test parser/task/operation, chặn gửi lại theo phạm vi, điều kiện nguồn/Tools/snapshot, xác nhận nguồn, đối soát và khôi phục sổ lệnh. Sau thay đổi cuối đã chạy lại build/lint, test policy và cả 4 test M3 trên Samsung (gồm xác nhận hủy task): tất cả đạt. Tổng cộng 15 test thiết bị khác nhau đã đạt trong đợt này. APK debug đã tạo; lúc 10:22 ngày 20/11/2026 đã cài đè app chính trên Samsung qua ADB Wi-Fi, giữ nguyên dữ liệu/hồ sơ, mở app thành công ở màn hình đăng nhập. Không chạy thao tác thay đổi trên server.
 - Trạng thái M3: đã tích hợp mã và UI; CHƯA nghiệm thu live. Chưa chạy power/snapshot/cancel trên hạ tầng thật. Còn kiểm thử VM lab được duyệt, lỗi quyền/capability và mất mạng sau gửi/mở lại app trên server; M2 cũng còn các mục nghiệm thu nêu trên.
 
+### Cap nhat M4 va UI Snapshot ngay 20/11/2026
+
+- Theo phe duyet mo rong pham vi: bo sung panel M4 con thieu cho cac hop dong hien co (resources, disk, NIC, ISO, boot, clone, cold migration). Giu validation, baseline config, khoa busy/doi soat va buoc xac nhan truoc gui.
+- Sua icon Nguon/Snapshot bang Canvas; popup hien danh sach snapshot ngay, cho chon truoc Xoa/Revert; nut gon tu xuong dong.
+- Build debug thanh cong; 54 unit test va 11 UI test M3/panel M4 dat tren Samsung Android 12; lint 0 loi/15 canh bao. Cai de app chinh bi chan boi chu ky khac (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); giu nguyen app/du lieu, can keystore goc. M4 van CHUA nghiem thu live; khong chay lenh thay doi ha tang that trong dot nay. Cac ket qua test tu dong khong thay the doi chieu vCenter/quyen/license/topology.
+
+### Ra soat baseline M4 ngay 21/11/2026
+
+- Da ket noi lai Samsung SM-N976N Android 12 qua ADB Wi-Fi va chieu man hinh bang scrcpy; khong ghi endpoint thiet bi vao source.
+- Kiem tra hien trang truoc khi sua code: assembleDebug thanh cong, 2 unit test AdvancedExecutionPolicyTest va 2 UI test VmAdvancedPanelTest dat tren Samsung; lintDebug 0 loi/15 canh bao. Selector VmConfigTest khong khop test hien co, khong tinh la da kiem thu parser M4.
+- M4 van dang trien khai: co CPU/RAM/topology/hot add, mot phan disk/NIC/ISO/boot, clone VM tat va cold migration. Chua co precheck tuong thich migration phia server; con thieu reservation/limit/shares, quan ly controller va VM Options day du theo ke hoach. Chua nghiem thu live.
+- Khong sua code trong dot ra soat, khong cai de app chinh, khong xoa ho so va khong gui lenh thay doi ha tang that. Blocker chu ky APK khac ban da cai van chua duoc xu ly.
+
 ## 3. Giai đoạn 0 — Chốt phạm vi, API và môi trường
 
 ### Bước 0.1 — Đọc thiết kế và lập danh sách chức năng

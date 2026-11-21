@@ -11,7 +11,8 @@ internal data class ServiceContent(
     val rootFolder: String, val performanceManager: String? = null, val eventManager: String? = null,
     val taskManager: String? = null, val provisioningChecker: String? = null
 )
-internal class SoapFailure(message: String, val expired: Boolean = false) : Exception(message)
+internal class SoapFailure(message: String, val expired: Boolean = false, val rejected: Boolean = false,
+    val httpStatus: Int? = null) : Exception(message)
 
 internal object VsphereSoap {
     private const val VIM = "urn:vim25"
@@ -81,7 +82,7 @@ internal object VsphereSoap {
                     noPermission > 0 -> "SOAP NoPermission: tài khoản thiếu quyền trên vCenter."
                     knownFault != null -> "SOAP $knownFault ($method$propertyHint): vCenter từ chối yêu cầu API."
                     else -> "Endpoint SOAP trả về fault ($method); chưa xác định nguyên nhân."
-                }, expired)
+                }, expired, rejected = true)
             }
             return children(body, "${method}Response", VIM) ?: throw SoapFailure("Phản hồi SOAP không đúng phương thức.")
         } catch (e: SoapFailure) {

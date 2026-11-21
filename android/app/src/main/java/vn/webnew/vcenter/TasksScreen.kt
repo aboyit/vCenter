@@ -18,10 +18,52 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-internal fun VsphereTask.taskTitle(): String = description?.takeIf { it.isNotBlank() }
-    ?: descriptionId?.takeIf { it.isNotBlank() }
-    ?: name?.takeIf { it.isNotBlank() }
-    ?: "Thao tác vCenter (chưa có tên)"
+private val taskOperationLabels = mapOf(
+    "powerOn" to "Bật nguồn VM", "PowerOnVM_Task" to "Bật nguồn VM",
+    "powerOff" to "Tắt nguồn VM", "PowerOffVM_Task" to "Tắt nguồn VM",
+    "reset" to "Reset VM", "ResetVM_Task" to "Reset VM",
+    "suspend" to "Tạm ngưng VM", "SuspendVM_Task" to "Tạm ngưng VM",
+    "createSnapshot" to "Tạo snapshot", "CreateSnapshot_Task" to "Tạo snapshot",
+    "CreateSnapshotEx_Task" to "Tạo snapshot",
+    "removeSnapshot" to "Xóa snapshot", "RemoveSnapshot_Task" to "Xóa snapshot",
+    "removeAllSnapshots" to "Xóa toàn bộ snapshot", "RemoveAllSnapshots_Task" to "Xóa toàn bộ snapshot",
+    "revertToSnapshot" to "Revert snapshot", "RevertToSnapshot_Task" to "Revert snapshot",
+    "revertToCurrentSnapshot" to "Revert snapshot hiện tại", "RevertToCurrentSnapshot_Task" to "Revert snapshot hiện tại",
+    "consolidateDisks" to "Hợp nhất đĩa snapshot", "ConsolidateVMDisks_Task" to "Hợp nhất đĩa snapshot",
+    "reconfigure" to "Cấu hình VM", "ReconfigVM_Task" to "Cấu hình VM",
+    "clone" to "Clone VM", "CloneVM_Task" to "Clone VM",
+    "migrate" to "Di chuyển VM", "MigrateVM_Task" to "Di chuyển VM",
+    "relocate" to "Di chuyển VM / lưu trữ", "RelocateVM_Task" to "Di chuyển VM / lưu trữ"
+)
+
+private val hostNetworkTaskLabels = mapOf(
+    "removeVirtualSwitch" to "Xóa vSwitch", "addVirtualSwitch" to "Tạo vSwitch",
+    "updateVirtualSwitch" to "Cập nhật vSwitch", "removePortGroup" to "Xóa port group",
+    "addPortGroup" to "Tạo port group", "updatePortGroup" to "Cập nhật port group",
+    "addVirtualNic" to "Thêm VMkernel adapter", "removeVirtualNic" to "Xóa VMkernel adapter",
+    "updateVirtualNic" to "Cập nhật VMkernel adapter", "updateNetworkConfig" to "Cập nhật cấu hình mạng host"
+)
+
+internal fun VsphereTask.taskTitle(): String {
+    val identifiers = listOfNotNull(descriptionId, name)
+    identifiers.forEach { id ->
+        if (id.startsWith("host.NetworkSystem.")) hostNetworkTaskLabels[id.substringAfterLast('.')]?.let { return it }
+        if (id.startsWith("VirtualMachine.") || !id.contains('.')) {
+            taskOperationLabels[id.substringAfterLast('.')]?.let { return it }
+        }
+    }
+    return description?.takeIf { it.isNotBlank() }
+        ?: descriptionId?.takeIf { it.isNotBlank() }
+        ?: name?.takeIf { it.isNotBlank() }
+        ?: "Thao tác vCenter (chưa có tên)"
+}
+
+// Use the same timestamp for ordering and display; invalid values fall back to other server timestamps.
+internal fun VsphereTask.listTime(): Instant? = listOf(completedAt, startedAt, queuedAt)
+    .firstNotNullOfOrNull { value -> value?.let { runCatching { Instant.parse(it) }.getOrNull() } }
+
+internal fun newestTasksFirst(tasks: List<VsphereTask>): List<VsphereTask> =
+    tasks.sortedWith(compareByDescending<VsphereTask> { it.listTime() }.thenBy { it.ref })
 
 private fun VsphereTask.canRequestCancellation() = accessible && cancelable == true &&
     state in setOf("queued", "running") && cancelled != true
@@ -79,13 +121,13 @@ private fun TaskStatus(task: VsphereTask) {
 
 @Composable
 internal fun TasksScreen(state: ConnectionState, refresh: () -> Unit,
-    cancel: (String) -> Unit, review: (String) -> Unit) {
+    cancel: (String) -> Unit, refreshTracking: () -> Unit) {
     var cancelRef by remember { mutableStateOf<String?>(null) }
     var selectedRef by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("all") }
     val filters = listOf("all" to "Tất cả", "active" to "Đang xử lý", "error" to "Thất bại", "success" to "Thành công")
-    val visible = state.tasks.filter { task ->
+    val visible = newestTasksFirst(state.tasks).filter { task ->
         val matchesState = when (filter) {
             "active" -> task.accessible && task.cancelled != true && task.state in setOf("queued", "running")
             "error" -> task.accessible && task.cancelled != true && task.state == "error"
@@ -99,7 +141,7 @@ internal fun TasksScreen(state: ConnectionState, refresh: () -> Unit,
     state.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     if (state.pendingOperations.isNotEmpty()) {
         Text("Lệnh từ app", style = MaterialTheme.typography.titleSmall)
-        PendingOperationsPanel(state.pendingOperations, review)
+        PendingOperationsPanel(state.pendingOperations, refreshTracking)
     }
     OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().testTag("task-search"),
         placeholder = { Text("Tìm thao tác, đối tượng, tài khoản...") },
@@ -124,7 +166,7 @@ internal fun TasksScreen(state: ConnectionState, refresh: () -> Unit,
                 Text(task.taskTitle(), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(task.entity?.name ?: task.entity?.ref ?: "Không có đối tượng", style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(task.user ?: "Không có người thực hiện", style = MaterialTheme.typography.bodySmall,
+                Text("Tài khoản: ${task.user ?: "Chưa có dữ liệu"}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (task.state == "running" && task.accessible && task.cancelled != true) {
                     task.progress?.let {
@@ -136,10 +178,14 @@ internal fun TasksScreen(state: ConnectionState, refresh: () -> Unit,
                     style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 if (!task.accessible) Text("Không truy xuất được task; không suy ra thành công.", color = MaterialTheme.colorScheme.error)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Text("${taskTime(task.completedAt ?: task.startedAt ?: task.queuedAt)} · ${taskDuration(task)}",
+                Text("${when {
+                    task.completedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } != null -> "Kết thúc"
+                    task.startedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } != null -> "Bắt đầu"
+                    else -> "Vào hàng đợi"
+                }}: ${taskTime(task.listTime()?.toString())} · ${taskDuration(task)}",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(task.ref, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
+                    Text("Mã task: ${task.ref}", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
                     TextButton(onClick = { selectedRef = task.ref }, modifier = Modifier.testTag("detail-${task.ref}")) { Text("Chi tiết") }
                     if (task.canRequestCancellation()) {
                         TextButton(onClick = { cancelRef = task.ref }, enabled = !state.operationBusy,

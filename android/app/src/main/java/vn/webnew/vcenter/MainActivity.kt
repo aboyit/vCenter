@@ -124,7 +124,7 @@ fun VCenterApp() {
             lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
                 while (true) {
                     connectionModel.refreshTasks()
-                    kotlinx.coroutines.delay(if (current == Destination.Tasks) 5_000 else 20_000)
+                    kotlinx.coroutines.delay(if (connectionModel.state.value.pendingOperations.any { it.status !in OperationPolicy.terminal }) 3_000 else 20_000)
                 }
             }
         }
@@ -254,7 +254,7 @@ fun VCenterApp() {
                         ConnectionScreen(connection, connectionModel)
                     } else if (current == Destination.Tasks) {
                         TasksScreen(connection, connectionModel::refreshTasks, connectionModel::cancelTask,
-                            connectionModel::reviewOperation)
+                            connectionModel::refreshTasks)
                     } else if (current in listOf(Destination.Overview, Destination.Vms, Destination.Hosts,
                             Destination.Datastores, Destination.Network, Destination.Alarms)) {
                         InventoryScreen(InventorySection.valueOf(current.name), connection,
